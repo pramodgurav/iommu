@@ -100,7 +100,7 @@
 
 		idle-states {
 			CPU_SPC: spc {
-				compatible = "arm,idle-state";
+				compatible = "qcom,idle-state-spc", "arm,idle-state";
 				arm,psci-suspend-param = <0x40000002>;
 				entry-latency-us = <130>;
 				exit-latency-us = <150>;
