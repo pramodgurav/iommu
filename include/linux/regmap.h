@@ -1052,6 +1052,12 @@ static inline bool regmap_can_raw_read(struct regmap *map)
 	return false;
 }
 
+static inline bool regmap_can_raw_write(struct regmap *map)
+{
+	WARN_ONCE(1, "regmap API is disabled");
+	return false;
+}
+
 static inline int regmap_register_patch(struct regmap *map,
 					const struct reg_sequence *regs,
 					int num_regs)
