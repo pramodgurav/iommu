@@ -67,6 +67,80 @@ static struct lock_class_key eeprom_lock_key;
 
 #define to_nvmem_device(d) container_of(d, struct nvmem_device, dev)
 
+static int nvmem_reg_read(struct nvmem_device *nvmem, unsigned int reg,
+			  void *val, size_t bytes)
+{
+	int i, ret = 0;
+	struct regmap *map = nvmem->regmap;
+	size_t word_count = bytes / nvmem->word_size;
+	unsigned int ival;
+	u32 *u32_buf = val;
+	u16 *u16_buf = val;
+	u8 *u8_buf = val;
+
+	if (regmap_can_raw_read(map))
+		return regmap_raw_read(map, reg, val, bytes);
+
+	for (i = 0; i < word_count; i++) {
+		ret = regmap_read(map, reg + i * nvmem->stride, &ival);
+		if (ret != 0)
+			return ret;
+
+		switch (nvmem->word_size) {
+		case 4:
+			u32_buf[i] = ival;
+			break;
+		case 2:
+			u16_buf[i] = ival;
+			break;
+		case 1:
+			u8_buf[i] = ival;
+			break;
+		default:
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
+
+static int nvmem_reg_write(struct nvmem_device *nvmem, unsigned int reg,
+			   void *val, size_t bytes)
+{
+	int i, ret = 0;
+	struct regmap *map = nvmem->regmap;
+	size_t word_count = bytes / nvmem->word_size;
+	unsigned int ival;
+	u32 *u32_buf = val;
+	u16 *u16_buf = val;
+	u8 *u8_buf = val;
+
+	if (regmap_can_raw_write(map))
+		return regmap_raw_write(map, reg, val, bytes);
+
+	for (i = 0; i < word_count; i++) {
+		switch (nvmem->word_size) {
+		case 4:
+			ival =  u32_buf[i];
+			break;
+		case 2:
+			ival =  u16_buf[i];
+			break;
+		case 1:
+			ival =  u8_buf[i];
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		ret = regmap_write(map, reg + i * nvmem->stride, ival);
+		if (ret != 0)
+			return ret;
+	}
+
+	return ret;
+}
+
 static ssize_t bin_attr_nvmem_read(struct file *filp, struct kobject *kobj,
 				    struct bin_attribute *attr,
 				    char *buf, loff_t pos, size_t count)
@@ -93,7 +167,7 @@ static ssize_t bin_attr_nvmem_read(struct file *filp, struct kobject *kobj,
 
 	count = round_down(count, nvmem->word_size);
 
-	rc = regmap_raw_read(nvmem->regmap, pos, buf, count);
+	rc = nvmem_reg_read(nvmem, pos, buf, count);
 
 	if (IS_ERR_VALUE(rc))
 		return rc;
@@ -127,7 +201,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
 
 	count = round_down(count, nvmem->word_size);
 
-	rc = regmap_raw_write(nvmem->regmap, pos, buf, count);
+	rc = nvmem_reg_write(nvmem, pos, buf, count);
 
 	if (IS_ERR_VALUE(rc))
 		return rc;
@@ -948,7 +1022,7 @@ static int __nvmem_cell_read(struct nvmem_device *nvmem,
 {
 	int rc;
 
-	rc = regmap_raw_read(nvmem->regmap, cell->offset, buf, cell->bytes);
+	rc = nvmem_reg_read(nvmem, cell->offset, buf, cell->bytes);
 
 	if (IS_ERR_VALUE(rc))
 		return rc;
@@ -1014,7 +1088,7 @@ static inline void *nvmem_cell_prepare_write_buffer(struct nvmem_cell *cell,
 		*b <<= bit_offset;
 
 		/* setup the first byte with lsb bits from nvmem */
-		rc = regmap_raw_read(nvmem->regmap, cell->offset, &v, 1);
+		rc = nvmem_reg_read(nvmem, cell->offset, &v, 1);
 		*b++ |= GENMASK(bit_offset - 1, 0) & v;
 
 		/* setup rest of the byte if any */
@@ -1031,7 +1105,7 @@ static inline void *nvmem_cell_prepare_write_buffer(struct nvmem_cell *cell,
 	/* if it's not end on byte boundary */
 	if ((nbits + bit_offset) % BITS_PER_BYTE) {
 		/* setup the last byte with msb bits from nvmem */
-		rc = regmap_raw_read(nvmem->regmap,
+		rc = nvmem_reg_read(nvmem,
 				    cell->offset + cell->bytes - 1, &v, 1);
 		*p |= GENMASK(7, (nbits + bit_offset) % BITS_PER_BYTE) & v;
 
@@ -1064,7 +1138,7 @@ int nvmem_cell_write(struct nvmem_cell *cell, void *buf, size_t len)
 			return PTR_ERR(buf);
 	}
 
-	rc = regmap_raw_write(nvmem->regmap, cell->offset, buf, cell->bytes);
+	rc = nvmem_reg_write(nvmem, cell->offset, buf, cell->bytes);
 
 	/* free the tmp buffer */
 	if (cell->bit_offset || cell->nbits)
@@ -1155,7 +1229,7 @@ int nvmem_device_read(struct nvmem_device *nvmem,
 	if (!nvmem || !nvmem->regmap)
 		return -EINVAL;
 
-	rc = regmap_raw_read(nvmem->regmap, offset, buf, bytes);
+	rc = nvmem_reg_read(nvmem, offset, buf, bytes);
 
 	if (IS_ERR_VALUE(rc))
 		return rc;
@@ -1183,7 +1257,7 @@ int nvmem_device_write(struct nvmem_device *nvmem,
 	if (!nvmem || !nvmem->regmap)
 		return -EINVAL;
 
-	rc = regmap_raw_write(nvmem->regmap, offset, buf, bytes);
+	rc = nvmem_reg_write(nvmem, offset, buf, bytes);
 
 	if (IS_ERR_VALUE(rc))
 		return rc;
