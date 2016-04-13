@@ -1482,6 +1482,18 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 }
 
 /**
+ * regmap_can_raw_read - Test if regmap_raw_read() is supported
+ *
+ * @map: Map to check.
+ */
+bool regmap_can_raw_read(struct regmap *map)
+{
+	return map->bus && map->bus->read && map->format.format_val &&
+		map->format.format_reg;
+}
+EXPORT_SYMBOL_GPL(regmap_can_raw_read);
+
+/**
  * regmap_can_raw_write - Test if regmap_raw_write() is supported
  *
  * @map: Map to check.
@@ -2492,7 +2504,6 @@ int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
 		 * them we have a series of single read operations.
 		 */
 		size_t total_size = val_bytes * val_count;
-
 		if (!map->use_single_read &&
 		    (!map->max_raw_read || map->max_raw_read > total_size)) {
 			ret = regmap_raw_read(map, reg, val,

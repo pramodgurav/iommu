@@ -728,6 +728,7 @@ int regmap_get_val_bytes(struct regmap *map);
 int regmap_get_max_register(struct regmap *map);
 int regmap_get_reg_stride(struct regmap *map);
 int regmap_async_complete(struct regmap *map);
+bool regmap_can_raw_read(struct regmap *map);
 bool regmap_can_raw_write(struct regmap *map);
 size_t regmap_get_raw_read_max(struct regmap *map);
 size_t regmap_get_raw_write_max(struct regmap *map);
@@ -1043,6 +1044,12 @@ static inline void regcache_mark_dirty(struct regmap *map)
 static inline void regmap_async_complete(struct regmap *map)
 {
 	WARN_ONCE(1, "regmap API is disabled");
+}
+
+static inline bool regmap_can_raw_read(struct regmap *map)
+{
+	WARN_ONCE(1, "regmap API is disabled");
+	return false;
 }
 
 static inline int regmap_register_patch(struct regmap *map,
