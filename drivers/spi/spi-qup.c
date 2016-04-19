@@ -982,8 +982,11 @@ static int spi_qup_suspend(struct device *device)
 	if (ret)
 		return ret;
 
-	clk_disable_unprepare(controller->cclk);
-	clk_disable_unprepare(controller->iclk);
+	if (!pm_runtime_suspended(device)) {
+		clk_disable_unprepare(controller->cclk);
+		clk_disable_unprepare(controller->iclk);
+	}
+
 	return 0;
 }
 
@@ -993,17 +996,25 @@ static int spi_qup_resume(struct device *device)
 	struct spi_qup *controller = spi_master_get_devdata(master);
 	int ret;
 
-	ret = clk_prepare_enable(controller->iclk);
-	if (ret)
-		return ret;
+	if (!pm_runtime_suspended(device)) {
+		ret = clk_prepare_enable(controller->iclk);
+		if (ret)
+			return ret;
 
-	ret = clk_prepare_enable(controller->cclk);
-	if (ret)
-		return ret;
+		ret = clk_prepare_enable(controller->cclk);
+		if (ret) {
+			clk_disable_unprepare(controller->iclk);
+			return ret;
+		}
 
-	ret = spi_qup_set_state(controller, QUP_STATE_RESET);
-	if (ret)
-		return ret;
+		ret = spi_qup_set_state(controller, QUP_STATE_RESET);
+		if (ret) {
+			clk_disable_unprepare(controller->iclk);
+			clk_disable_unprepare(controller->cclk);
+
+			return ret;
+		}
+	}
 
 	return spi_master_resume(master);
 }
