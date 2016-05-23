@@ -9,3 +9,9 @@ config SMAF_CMA
 	depends on SMAF && HAVE_DMA_ATTRS
 	help
 	  Choose this option to enable CMA allocation within SMAF
+
+config SMAF_TEST_SECURE
+	tristate "SMAF secure module for test"
+	depends on SMAF
+	help
+	  Choose this option to enable secure module for test purpose
