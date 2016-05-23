@@ -1,0 +1,5 @@
+config SMAF
+	tristate "Secure Memory Allocation Framework"
+	depends on DMA_SHARED_BUFFER
+	help
+	  Choose this option to enable Secure Memory Allocation Framework
