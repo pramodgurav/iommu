@@ -838,23 +838,6 @@ static unsigned int msm_get_mctrl(struct uart_port *port)
 	return TIOCM_CAR | TIOCM_CTS | TIOCM_DSR | TIOCM_RTS;
 }
 
-static void msm_reset(struct uart_port *port)
-{
-	struct msm_port *msm_port = UART_TO_MSM(port);
-
-	/* reset everything */
-	msm_write(port, UART_CR_CMD_RESET_RX, UART_CR);
-	msm_write(port, UART_CR_CMD_RESET_TX, UART_CR);
-	msm_write(port, UART_CR_CMD_RESET_ERR, UART_CR);
-	msm_write(port, UART_CR_CMD_RESET_BREAK_INT, UART_CR);
-	msm_write(port, UART_CR_CMD_RESET_CTS, UART_CR);
-	msm_write(port, UART_CR_CMD_SET_RFR, UART_CR);
-
-	/* Disable DM modes */
-	if (msm_port->is_uartdm)
-		msm_write(port, 0, UARTDM_DMEN);
-}
-
 static void msm_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
 	unsigned int mr;
@@ -1003,7 +986,6 @@ static int msm_set_baud_rate(struct uart_port *port, unsigned int baud,
 	msm_write(port, 10, UART_TFWR);
 
 	msm_write(port, UART_CR_CMD_PROTECTION_EN, UART_CR);
-	msm_reset(port);
 
 	/* Enable RX and TX */
 	msm_write(port, UART_CR_TX_ENABLE | UART_CR_RX_ENABLE, UART_CR);
