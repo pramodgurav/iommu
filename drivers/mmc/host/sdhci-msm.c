@@ -18,6 +18,7 @@
 #include <linux/of_device.h>
 #include <linux/delay.h>
 #include <linux/mmc/mmc.h>
+#include <linux/pm_runtime.h>
 #include <linux/slab.h>
 
 #include "sdhci-pltfm.h"
@@ -549,6 +550,11 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	if (ret)
 		goto clk_disable;
 
+	platform_set_drvdata(pdev, msm_host);
+
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	return 0;
 
 clk_disable:
@@ -580,12 +586,63 @@ static int sdhci_msm_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int sdhci_msm_runtime_suspend(struct device *dev)
+{
+	struct sdhci_msm_host *msm_host = dev_get_drvdata(dev);
+
+	clk_disable_unprepare(msm_host->clk);
+	clk_disable_unprepare(msm_host->pclk);
+
+	return 0;
+}
+
+static int sdhci_msm_runtime_resume(struct device *dev)
+{
+	struct sdhci_msm_host *msm_host = dev_get_drvdata(dev);
+	int ret;
+
+	ret = clk_prepare_enable(msm_host->clk);
+	if (ret) {
+		dev_err(dev, "clk_enable failed: %d\n", ret);
+		return ret;
+	}
+	ret = clk_prepare_enable(msm_host->pclk);
+	if (ret) {
+		dev_err(dev, "clk_enable failed: %d\n", ret);
+		clk_disable_unprepare(msm_host->clk);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int sdhci_msm_suspend(struct device *dev)
+{
+	pm_runtime_force_suspend(dev);
+
+	return 0;
+}
+
+static int sdhci_msm_resume(struct device *dev)
+{
+	pm_runtime_force_resume(dev);
+
+	return 0;
+}
+
+static const struct dev_pm_ops sdhci_msm_pm_ops = {
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(sdhci_msm_suspend, sdhci_msm_resume)
+	SET_RUNTIME_PM_OPS(sdhci_msm_runtime_suspend, sdhci_msm_runtime_resume,
+				NULL)
+};
+
 static struct platform_driver sdhci_msm_driver = {
 	.probe = sdhci_msm_probe,
 	.remove = sdhci_msm_remove,
 	.driver = {
 		   .name = "sdhci_msm",
 		   .of_match_table = sdhci_msm_dt_match,
+		   .pm = &sdhci_msm_pm_ops,
 	},
 };
 
