@@ -530,8 +530,11 @@ static void bam_free_chan(struct dma_chan *chan)
 	struct bam_device *bdev = bchan->bdev;
 	u32 val;
 	unsigned long flags;
+	int ret;
 
-	pm_runtime_get_sync(bdev->dev);
+	ret = pm_runtime_get_sync(bdev->dev);
+	if (ret < 0)
+		return;
 
 	vchan_free_chan_resources(to_virt_chan(chan));
 
@@ -705,8 +708,11 @@ static int bam_pause(struct dma_chan *chan)
 	struct bam_chan *bchan = to_bam_chan(chan);
 	struct bam_device *bdev = bchan->bdev;
 	unsigned long flag;
+	int ret;
 
-	pm_runtime_get_sync(bdev->dev);
+	ret = pm_runtime_get_sync(bdev->dev);
+	if (ret < 0)
+		return ret;
 
 	spin_lock_irqsave(&bchan->vc.lock, flag);
 	writel_relaxed(1, bam_addr(bdev, bchan->id, BAM_P_HALT));
@@ -728,8 +734,12 @@ static int bam_resume(struct dma_chan *chan)
 	struct bam_chan *bchan = to_bam_chan(chan);
 	struct bam_device *bdev = bchan->bdev;
 	unsigned long flag;
+	int ret;
 
-	pm_runtime_get_sync(bdev->dev);
+	ret = pm_runtime_get_sync(bdev->dev);
+	if (ret < 0)
+		return ret;
+
 	spin_lock_irqsave(&bchan->vc.lock, flag);
 	writel_relaxed(0, bam_addr(bdev, bchan->id, BAM_P_HALT));
 	bchan->paused = 0;
@@ -811,6 +821,7 @@ static irqreturn_t bam_dma_irq(int irq, void *data)
 {
 	struct bam_device *bdev = data;
 	u32 clr_mask = 0, srcs = 0;
+	int ret;
 
 	srcs |= process_channel_irqs(bdev);
 
@@ -818,7 +829,9 @@ static irqreturn_t bam_dma_irq(int irq, void *data)
 	if (srcs & P_IRQ)
 		tasklet_schedule(&bdev->task);
 
-	pm_runtime_get_sync(bdev->dev);
+	ret = pm_runtime_get_sync(bdev->dev);
+	if (ret < 0)
+		return ret;
 
 	if (srcs & BAM_IRQ) {
 		clr_mask = readl_relaxed(bam_addr(bdev, 0, BAM_IRQ_STTS));
@@ -914,6 +927,7 @@ static void bam_start_dma(struct bam_chan *bchan)
 	struct bam_desc_hw *desc;
 	struct bam_desc_hw *fifo = PTR_ALIGN(bchan->fifo_virt,
 					sizeof(struct bam_desc_hw));
+	int ret;
 
 	lockdep_assert_held(&bchan->vc.lock);
 
@@ -925,7 +939,9 @@ static void bam_start_dma(struct bam_chan *bchan)
 	async_desc = container_of(vd, struct bam_async_desc, vd);
 	bchan->curr_txd = async_desc;
 
-	pm_runtime_get_sync(bdev->dev);
+	ret = pm_runtime_get_sync(bdev->dev);
+	if (ret < 0)
+		return;
 
 	/* on first use, initialize the channel hardware */
 	if (!bchan->initialized)
