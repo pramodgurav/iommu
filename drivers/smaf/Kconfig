@@ -6,7 +6,7 @@ config SMAF
 
 config SMAF_CMA
 	tristate "SMAF CMA allocator"
-	depends on SMAF && HAVE_DMA_ATTRS
+	depends on SMAF
 	help
 	  Choose this option to enable CMA allocation within SMAF
 
